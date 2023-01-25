@@ -1,0 +1,1 @@
+# lqs-weapon-pickup
