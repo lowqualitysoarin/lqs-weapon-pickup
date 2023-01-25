@@ -1,4 +1,4 @@
---low_quality_soarin © 2022-2023
+--low_quality_soarin, RadioactiveJellyfish © 2023-2024
 behaviour("WeaponPickup")
 
 local pickupDetected = false
@@ -12,7 +12,6 @@ function WeaponPickup:Start()
 	-- Rigid Force
 	self.throwForce = 18.7
 	self.upwardForce = 8.5
-	self.pickupRange = self.script.mutator.GetConfigurationFloat("pickupRange")
 
 	-- Data Setup
 	self.droppedWeapons = {}
@@ -21,6 +20,8 @@ function WeaponPickup:Start()
 	self.dataObject = self.targets.emptyCopy
 
 	-- Config
+	self.pickupRange = self.script.mutator.GetConfigurationFloat("pickupRange")
+
 	self.canDespawn = self.script.mutator.GetConfigurationBool("canDespawn")
 	self.despawnTime = self.script.mutator.GetConfigurationFloat("despawnTime")
 
@@ -93,27 +94,36 @@ end
 
 function WeaponPickup:Update()
 	-- Pickup Base
-	local pickupRay = PlayerCamera.activeCamera.ViewportPointToRay(Vector3(0.5, 0.5, 0))
-	pickupRayCast = Physics.Spherecast(pickupRay, 0.25, self.pickupRange, RaycastTarget.Default)
-	
+	-- Dropping
 	if (Input.GetKeyDown(self.dropKey) and Player.actor.activeWeapon ~= nil and self:CanBeDropped(Player.actor.activeWeapon)) then
 		self:DropWeaponManual(Player.actor.activeWeapon)
 	end
 
-	if (pickupRayCast ~= nil) then
-		if (pickupRayCast.collider.gameObject.name == "[LQS]PickupHitbox{}(Clone)") then
-			pickupDetected = true
-		else
-			pickupDetected = false
-			alreadyChecked = false
-		end
+	-- Picking Up
+	if (Input.GetKeyDown(self.pickupKey) and self.canPickup) then
+		-- Launching ray when the use key is pressed, since always casting a ray is kinda unoptimised they say...
+		local pickupRay = PlayerCamera.activeCamera.ViewportPointToRay(Vector3(0.5, 0.5, 0))
+	    pickupRayCast = Physics.Spherecast(pickupRay, 0.25, self.pickupRange, RaycastTarget.Default)
 
-		local compatChecks = self:CompatChecks()
-		if (Input.GetKeyDown(self.pickupKey) and pickupDetected and self.canPickup and compatChecks) then
-			local currentPickup = pickupRayCast.collider.gameObject
-			self:PickUpWeaponStart(currentPickup)
-			self.canPickup = false
-		    self.script.StartCoroutine("PickupDelay")
+		if (pickupRayCast ~= nil) then
+			-- Do validation if the object that the raycast got is a pickup hitbox.
+			if (pickupRayCast.collider.gameObject.name == "[LQS]PickupHitbox{}(Clone)") then
+				pickupDetected = true
+			else
+				pickupDetected = false
+				alreadyChecked = false
+			end
+
+			-- Compatibility check by RadioactiveJello
+			local compatChecks = self:CompatChecks()
+
+			-- If pickup is valid then pick up the weapon.
+			if (pickupDetected and compatChecks) then
+				local currentPickup = pickupRayCast.collider.gameObject
+				self:PickUpWeaponStart(currentPickup)
+				self.canPickup = false
+				self.script.StartCoroutine("PickupDelay")
+			end
 		end
 	end
 end
@@ -149,12 +159,16 @@ function WeaponPickup:DropWeaponManual(weapon)
 	local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
 	local weaponImposter = selectedWeapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
 
-	-- Bounds Scaling
-	if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
-		droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
-	end
+	-- Do some extra properties if weaponImposter isn't a nil
+	if (weaponImposter ~= nil) then
+		-- Checks for valid renderers. If it has then set hitbox scale to renderer bounds size
+		if (self:HasValidRenderer(weaponImposter)) then
+			droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+		end
 
-	weaponImposter.transform.parent = droppedWeapon.transform
+		-- Parent the weaponImposter to the hitbox after scaling
+		weaponImposter.transform.parent = droppedWeapon.transform
+	end
 
 	local droppedRB = droppedWeapon.gameObject.GetComponent(Rigidbody)
 
@@ -197,12 +211,16 @@ function WeaponPickup:DropWeapon(weapon, actor)
 		local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
 		local weaponImposter = weapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
 	
-		-- Bounds Scaling
-		if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
-			droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+		-- Do some extra properties if weaponImposter isn't a nil
+		if (weaponImposter ~= nil) then
+			-- Checks for valid renderers. If it has then set hitbox scale to renderer bounds size
+			if (self:HasValidRenderer(weaponImposter)) then
+				droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+			end
+
+			-- Parent the weaponImposter to the hitbox after scaling
+			weaponImposter.transform.parent = droppedWeapon.transform
 		end
-	
-		weaponImposter.transform.parent = droppedWeapon.transform
 	
 		local droppedRB = droppedWeapon.gameObject.GetComponent(Rigidbody)
 	
@@ -235,6 +253,15 @@ function WeaponPickup:DropWeapon(weapon, actor)
 	
 		local randomRot = Random.Range(-150, 150)
 		droppedRB.AddTorque(Vector3(randomRot, randomRot, randomRot))
+	end
+end
+
+function WeaponPickup:HasValidRenderer(weaponImposter)
+	if (weaponImposter.gameObject.GetComponent(Renderer)) then
+		return true
+	else
+		error("There is no Valid Third Person Renderer for this gun")
+		return false
 	end
 end
 
@@ -277,7 +304,7 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 		elseif (receivedWeapon.slot == WeaponSlot.Gear) then
 			Player.actor.EquipNewWeaponEntry(receivedWeapon, 2, true)
 		elseif (receivedWeapon.slot == WeaponSlot.LargeGear) then
-			Player.actor.EquipNewWeaponEntry(receivedWeapon, 3, true)
+			Player.actor.EquipNewWeaponEntry(receivedWeapon, 4, true)
 		end
 
 		local newWeapon = Player.actor.activeWeapon
