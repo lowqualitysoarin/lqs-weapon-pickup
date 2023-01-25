@@ -1,0 +1,274 @@
+--low_quality_soarin © 2022-2023
+behaviour("WeaponPickup")
+
+local pickupDetected = false
+local pickupRayCast = nil
+local alreadyChecked = false
+
+function WeaponPickup:Start()
+	-- Base
+	self.weaponBoxCollider = self.targets.cubeCollider
+
+	-- Rigid Force
+	self.throwForce = 18.7
+	self.upwardForce = 8.5
+	self.pickupRange = self.script.mutator.GetConfigurationFloat("pickupRange")
+
+	-- Data Setup
+	self.droppedWeapons = {}
+	self.droppedIndex = 1
+
+	self.dataObject = self.targets.emptyCopy
+
+	-- Config
+	self.canDespawn = self.script.mutator.GetConfigurationBool("canDespawn")
+	self.despawnTime = self.script.mutator.GetConfigurationFloat("despawnTime")
+
+	self.pickupDelay = self.script.mutator.GetConfigurationFloat("pickupDelay")
+	self.canPickup = true
+
+	self.dropChanceEnabled = self.script.mutator.GetConfigurationBool("dropChanceEnabled")
+	self.dropChanceDontAffectPlayer = self.script.mutator.GetConfigurationBool("dropChanceDontAffectPlayer")
+	self.dropChance = self.script.mutator.GetConfigurationRange("dropChance")
+
+	self.canBlacklist = self.script.mutator.GetConfigurationBool("canBlacklist")
+	self.blacklistedWeapons = {}
+
+	for word in string.gmatch(string.upper(self.script.mutator.GetConfigurationString("weaponBlacklist")), '([^,]+)') do
+		self.blacklistedWeapons[word] = true
+	end
+
+	self.dropDistanceEnabled = self.script.mutator.GetConfigurationBool("dropByDistance")
+	self.dropDistance = self.script.mutator.GetConfigurationFloat("dropDistance")
+
+	-- Keybinds
+	self.pickupKey = string.lower(self.script.mutator.GetConfigurationString("pickupKey"))
+	self.dropKey = string.lower(self.script.mutator.GetConfigurationString("dropKey"))
+
+	-- Listeners
+	GameEvents.onActorDied.AddListener(self, "OnActorDied")
+end
+
+function WeaponPickup:OnActorDied(actor)
+	if (self.dropDistanceEnabled) then
+		local distanceToPlayer = (actor.transform.position - Player.actor.transform.position).magnitude
+		if (distanceToPlayer > self.dropDistance) then return end
+	end
+
+	if (self:CanBeDropped(actor.activeWeapon)) then
+		if (self.dropChanceEnabled) then
+			if (self.dropChanceDontAffectPlayer) then
+				if (not actor.isPlayer) then
+					local luck = Random.Range(0, 100)
+
+					if (luck < self.dropChance) then
+						self:DropWeapon(actor.activeWeapon, actor)
+					end
+				else
+					self:DropWeapon(actor.activeWeapon, actor)
+				end
+			else
+				local luck = Random.Range(0, 100)
+
+				if (luck < self.dropChance) then
+					self:DropWeapon(actor.activeWeapon, actor)
+				end
+			end
+		else
+			self:DropWeapon(actor.activeWeapon, actor)
+		end
+	end
+end
+
+function WeaponPickup:Update()
+	-- Pickup Base
+	local pickupRay = PlayerCamera.activeCamera.ViewportPointToRay(Vector3(0.5, 0.5, 0))
+	pickupRayCast = Physics.Spherecast(pickupRay, 0.25, self.pickupRange, RaycastTarget.Default)
+	
+	if (Input.GetKeyDown(self.dropKey) and Player.actor.activeWeapon ~= nil and self:CanBeDropped(Player.actor.activeWeapon)) then
+		self:DropWeaponManual(Player.actor.activeWeapon)
+	end
+
+	if (pickupRayCast ~= nil) then
+		if (pickupRayCast.collider.gameObject.name == "[LQS]PickupHitbox{}(Clone)") then
+			pickupDetected = true
+		else
+			pickupDetected = false
+			alreadyChecked = false
+		end
+
+		if (Input.GetKeyDown(self.pickupKey) and pickupDetected and self.canPickup) then
+			local currentPickup = pickupRayCast.collider.gameObject
+			self:PickUpWeaponStart(currentPickup)
+			self.canPickup = false
+		    self.script.StartCoroutine("PickupDelay")
+		end
+	end
+end
+
+function WeaponPickup:CanBeDropped(weapon)
+	if (self.canBlacklist) then
+		if (weapon ~= nil) then
+			if (self.blacklistedWeapons[weapon.weaponEntry.name] == true) then
+				return false
+			else
+				return true
+			end
+		else
+			return false
+		end
+	else
+		return true
+	end
+end
+
+function WeaponPickup:PickupDelay()
+	coroutine.yield(WaitForSeconds(self.pickupDelay))
+	self.canPickup = true
+	return nil
+end
+
+function WeaponPickup:DropWeaponManual(weapon)
+	-- Make Pickup Prefab
+	local selectedWeapon = weapon
+	local playerCam = PlayerCamera.activeCamera.transform
+	local spawnPos = selectedWeapon.transform.position + playerCam.forward
+
+	local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
+	local weaponImposter = selectedWeapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
+
+	-- Bounds Scaling
+	if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
+		droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+	end
+
+	weaponImposter.transform.parent = droppedWeapon.transform
+
+	local droppedRB = droppedWeapon.gameObject.GetComponent(Rigidbody)
+
+	-- Data Setup (Jesus christ I'm sorry I really have to do this again...)
+	-- Weapon
+	self:FindDroppedWeapon(selectedWeapon, droppedWeapon)
+
+	-- Ammo
+	local weaponAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+	local weaponSpareAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+
+	weaponAmmo.name = selectedWeapon.ammo
+	weaponSpareAmmo.name = selectedWeapon.spareAmmo
+	
+	-- Finishing Touches
+
+	droppedRB.AddForce(playerCam.forward * self.throwForce, ForceMode.Impulse)
+	droppedRB.AddForce(playerCam.up * self.upwardForce, ForceMode.Impulse)
+
+	local randomRot = Random.Range(-150, 150)
+	droppedRB.AddTorque(Vector3(randomRot, randomRot, randomRot))
+
+	-- Remove Weapon
+	local droppedWeaponSlot = selectedWeapon.gameObject.GetComponent(Weapon).slot
+	Player.actor.removeWeapon(droppedWeaponSlot)
+end
+
+function WeaponPickup:DropWeapon(weapon, actor)
+	-- Same thing on what I did above...
+	-- Do a check before doing shit
+	if (weapon ~= nil and actor ~= nil) then
+		-- Make Pickup Prefab
+		local spawnPos = Vector3(actor.transform.position.x, actor.transform.position.y + 1, actor.transform.position.z)
+
+		local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
+		local weaponImposter = weapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
+	
+		-- Bounds Scaling
+		if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
+			droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+		end
+	
+		weaponImposter.transform.parent = droppedWeapon.transform
+	
+		local droppedRB = droppedWeapon.gameObject.GetComponent(Rigidbody)
+	
+		-- Data Setup
+		-- Weapon
+		self:FindDroppedWeapon(weapon, droppedWeapon)
+	
+		-- Ammo (This ones randomized)
+		if (not actor.isPlayer) then
+			local weaponAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+			local weaponSpareAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+		
+			local randomAmmo = math.random(0, weapon.maxAmmo)
+			local randomSpare = math.random(0, weapon.maxSpareAmmo)
+
+			weaponAmmo.name = randomAmmo
+			weaponSpareAmmo.name = randomSpare
+		else
+			local weaponAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+			local weaponSpareAmmo = GameObject.Instantiate(self.dataObject, droppedWeapon.transform)
+		
+			weaponAmmo.name = weapon.ammo
+			weaponSpareAmmo.name = weapon.spareAmmo
+		end
+	
+		-- Finishing Touches
+	
+		droppedRB.AddForce(actor.transform.forward * self.throwForce, ForceMode.Impulse)
+		droppedRB.AddForce(actor.transform.up * self.upwardForce, ForceMode.Impulse)
+	
+		local randomRot = Random.Range(-150, 150)
+		droppedRB.AddTorque(Vector3(randomRot, randomRot, randomRot))
+	end
+end
+
+function WeaponPickup:FindDroppedWeapon(weapon, parent)
+	for ind,wep in pairs(WeaponManager.allWeapons) do
+		if (wep.name == weapon.weaponEntry.name and wep.uiSprite == weapon.weaponEntry.uiSprite) then
+			self.droppedWeapons[#self.droppedWeapons+1] = wep
+			break
+		end
+	end
+	
+	local weaponIndexObj = GameObject.Instantiate(self.dataObject, parent.transform)
+	weaponIndexObj.name = self.droppedIndex
+
+	self.droppedIndex = self.droppedIndex + 1
+end
+
+function WeaponPickup:PickUpWeaponStart(weapon)
+	if (weapon ~= nil) then
+		-- Get The Data
+		local weaponIndex = weapon.transform.GetChild(1)
+		local weaponAmmo = weapon.transform.GetChild(2)
+		local weaponSpareAmmo = weapon.transform.GetChild(3)
+
+		local receivedWeapon = self.droppedWeapons[tonumber(weaponIndex.gameObject.name)]
+
+		-- Overlap Check
+		for _,wep in pairs(Player.actor.weaponSlots) do
+			if (wep.weaponEntry.slot == receivedWeapon.slot) then
+				self:DropWeaponManual(wep)
+				break
+			end
+		end
+
+		-- Applying
+		if (receivedWeapon.slot == WeaponSlot.Primary) then
+			Player.actor.EquipNewWeaponEntry(receivedWeapon, 0, true)
+		elseif (receivedWeapon.slot == WeaponSlot.Secondary) then
+			Player.actor.EquipNewWeaponEntry(receivedWeapon, 1, true)
+		elseif (receivedWeapon.slot == WeaponSlot.Gear) then
+			Player.actor.EquipNewWeaponEntry(receivedWeapon, 2, true)
+		elseif (receivedWeapon.slot == WeaponSlot.LargeGear) then
+			Player.actor.EquipNewWeaponEntry(receivedWeapon, 3, true)
+		end
+
+		local newWeapon = Player.actor.activeWeapon
+	
+		newWeapon.ammo = tonumber(weaponAmmo.gameObject.name)
+		newWeapon.spareAmmo = tonumber(weaponSpareAmmo.gameObject.name)
+
+		-- Destroy Pickup
+		GameObject.Destroy(weapon)
+	end
+end
