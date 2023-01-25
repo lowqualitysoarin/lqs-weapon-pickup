@@ -47,6 +47,17 @@ function WeaponPickup:Start()
 
 	-- Listeners
 	GameEvents.onActorDied.AddListener(self, "OnActorDied")
+
+	-- Compatibility
+	local quickThrowObj = self.gameObject.Find("QuickThrow")
+	if quickThrowObj then
+		self.quickThrow = quickThrowObj.GetComponent(ScriptedBehaviour)
+	end
+
+	local armorObj = self.gameObject.Find("PlayerArmor")
+	if armorObj then
+		self.playerArmor = armorObj.GetComponent(ScriptedBehaviour)
+	end
 end
 
 function WeaponPickup:OnActorDied(actor)
@@ -97,7 +108,8 @@ function WeaponPickup:Update()
 			alreadyChecked = false
 		end
 
-		if (Input.GetKeyDown(self.pickupKey) and pickupDetected and self.canPickup) then
+		local compatChecks = self:CompatChecks()
+		if (Input.GetKeyDown(self.pickupKey) and pickupDetected and self.canPickup and compatChecks) then
 			local currentPickup = pickupRayCast.collider.gameObject
 			self:PickUpWeaponStart(currentPickup)
 			self.canPickup = false
@@ -168,12 +180,17 @@ function WeaponPickup:DropWeaponManual(weapon)
 	-- Remove Weapon
 	local droppedWeaponSlot = selectedWeapon.gameObject.GetComponent(Weapon).slot
 	Player.actor.removeWeapon(droppedWeaponSlot)
+
+	if self.quickThrow then
+		self.quickThrow.self:doDelayedEvaluate()
+	end
 end
 
 function WeaponPickup:DropWeapon(weapon, actor)
 	-- Same thing on what I did above...
 	-- Do a check before doing shit
-	if (weapon ~= nil and actor ~= nil) then
+	local compatChecks = self:CompatChecks()
+	if (weapon ~= nil and actor ~= nil and compatChecks) then
 		-- Make Pickup Prefab
 		local spawnPos = Vector3(actor.transform.position.x, actor.transform.position.y + 1, actor.transform.position.z)
 
@@ -270,5 +287,17 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 
 		-- Destroy Pickup
 		GameObject.Destroy(weapon)
+
+		--Quick Throw Compatibility
+		if self.quickThrow then
+			self.quickThrow.self:doDelayedEvaluate()
+		end
 	end
+end
+
+-- Will always return true if neither mod is present
+function WeaponPickup:CompatChecks()
+	if self.quickThrow and self.quickThrow.self.isThrowing then return false end
+	if self.playerArmor and self.playerArmor.self.isInArmorPlateMode then return false end
+	return true
 end
