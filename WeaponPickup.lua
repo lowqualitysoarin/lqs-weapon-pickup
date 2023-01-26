@@ -161,8 +161,8 @@ function WeaponPickup:DropWeaponManual(weapon)
 
 	-- Do some extra properties if weaponImposter isn't a nil
 	if (weaponImposter ~= nil) then
-		-- Checks for valid renderers. If it has then set hitbox scale to renderer bounds size
-		if (self:HasValidRenderer(weaponImposter)) then
+		-- Get the renderer. If it has then set hitbox scale to renderer bounds size
+		if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
 			droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
 		end
 
@@ -210,17 +210,17 @@ function WeaponPickup:DropWeapon(weapon, actor)
 
 		local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
 		local weaponImposter = weapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
-	
+
 		-- Do some extra properties if weaponImposter isn't a nil
-		if (weaponImposter ~= nil) then
-			-- Checks for valid renderers. If it has then set hitbox scale to renderer bounds size
-			if (self:HasValidRenderer(weaponImposter)) then
+	    if (weaponImposter ~= nil) then
+		    -- Get the renderer. If it has then set hitbox scale to renderer bounds size
+			if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
 				droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
 			end
-
+	
 			-- Parent the weaponImposter to the hitbox after scaling
 			weaponImposter.transform.parent = droppedWeapon.transform
-		end
+	    end
 	
 		local droppedRB = droppedWeapon.gameObject.GetComponent(Rigidbody)
 	
@@ -253,15 +253,6 @@ function WeaponPickup:DropWeapon(weapon, actor)
 	
 		local randomRot = Random.Range(-150, 150)
 		droppedRB.AddTorque(Vector3(randomRot, randomRot, randomRot))
-	end
-end
-
-function WeaponPickup:HasValidRenderer(weaponImposter)
-	if (weaponImposter.gameObject.GetComponent(Renderer)) then
-		return true
-	else
-		error("There is no Valid Third Person Renderer for this gun")
-		return false
 	end
 end
 
