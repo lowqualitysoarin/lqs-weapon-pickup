@@ -322,7 +322,7 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 		end
 		--Universal Recoil Compatibility
 		if self.isUsingURM then
-			self.URM:AssignWeaponStats(weapon)
+			self.URM:AssignWeaponStats(newWeapon)
 		end
 	end
 end
