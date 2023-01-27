@@ -59,6 +59,16 @@ function WeaponPickup:Start()
 	if armorObj then
 		self.playerArmor = armorObj.GetComponent(ScriptedBehaviour)
 	end
+
+	self.URM = GameObject.find("RecoilPrefab(Clone)")
+	self.isUsingURM = (self.URM ~= nil)
+
+	if (self.isUsingURM) then
+		self.URM = self.URM.gameObject.GetComponent(ScriptedBehaviour).self
+		print("Using URM")
+	else
+		print("Not using URM")
+	end
 end
 
 function WeaponPickup:OnActorDied(actor)
@@ -309,6 +319,10 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 		--Quick Throw Compatibility
 		if self.quickThrow then
 			self.quickThrow.self:doDelayedEvaluate()
+		end
+		--Universal Recoil Compatibility
+		if self.isUsingURM then
+			self.URM:AssignWeaponStats(weapon)
 		end
 	end
 end
