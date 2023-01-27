@@ -164,7 +164,7 @@ function WeaponPickup:DropWeaponManual(weapon)
 	-- Make Pickup Prefab
 	local selectedWeapon = weapon
 	local playerCam = PlayerCamera.activeCamera.transform
-	local spawnPos = selectedWeapon.transform.position + playerCam.forward
+	local spawnPos = playerCam.transform.position + playerCam.forward
 
 	local droppedWeapon = GameObject.Instantiate(self.weaponBoxCollider, spawnPos, Quaternion.identity)
 	local weaponImposter = selectedWeapon.weaponEntry.InstantiateImposter(droppedWeapon.transform.position, Quaternion.identity)
@@ -173,7 +173,15 @@ function WeaponPickup:DropWeaponManual(weapon)
 	if (weaponImposter ~= nil) then
 		-- Get the renderer. If it has then set hitbox scale to renderer bounds size
 		if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
-			droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+			local weaponRenderer = weaponImposter.gameObject.GetComponent(Renderer)
+
+			-- Check the bounds size of the weapon. If it passes then use the fixed values for the hitbox scale
+			-- Means it doesn't have a correct renderer size
+			if (not self:GreaterOrEqualScale(weaponRenderer.bounds.size, Vector3(1.9, 1.9, 1.9))) then
+				if (not self:LessOrEqualScale(weaponRenderer.bounds.size, Vector3(0.2, 0.2, 0.2))) then
+					droppedWeapon.transform.localScale = weaponRenderer.bounds.size
+				end
+			end
 		end
 
 		-- Parent the weaponImposter to the hitbox after scaling
@@ -225,7 +233,15 @@ function WeaponPickup:DropWeapon(weapon, actor)
 	    if (weaponImposter ~= nil) then
 		    -- Get the renderer. If it has then set hitbox scale to renderer bounds size
 			if (weaponImposter.gameObject.GetComponent(Renderer) ~= nil) then
-				droppedWeapon.transform.localScale = weaponImposter.gameObject.GetComponent(Renderer).bounds.size
+				local weaponRenderer = weaponImposter.gameObject.GetComponent(Renderer)
+	
+				-- Check the bounds size of the weapon. If it passes then use the fixed values for the hitbox scale
+				-- Means it doesn't have a correct renderer size
+				if (not self:GreaterOrEqualScale(weaponRenderer.bounds.size, Vector3(1.9, 1.9, 1.9))) then
+					if (not self:LessOrEqualScale(weaponRenderer.bounds.size, Vector3(0.2, 0.2, 0.2))) then
+						droppedWeapon.transform.localScale = weaponRenderer.bounds.size
+					end
+				end
 			end
 	
 			-- Parent the weaponImposter to the hitbox after scaling
@@ -264,6 +280,23 @@ function WeaponPickup:DropWeapon(weapon, actor)
 		local randomRot = Random.Range(-150, 150)
 		droppedRB.AddTorque(Vector3(randomRot, randomRot, randomRot))
 	end
+end
+
+-- These two functions are gotten off Chai's weapon pickup code should fix some weapons just vanishing when dropped
+function WeaponPickup:GreaterOrEqualScale(objScale,other)
+	if (objScale.x >= other.x and objScale.y >= other.y and objScale.z >= other.z) then
+        return true
+    else
+        return false
+    end
+end
+
+function WeaponPickup:LessOrEqualScale(objScale, other)
+	if (objScale.x <= other.x and objScale.y <= other.y and objScale.z <= other.z) then
+        return true
+    else
+        return false
+    end
 end
 
 function WeaponPickup:FindDroppedWeapon(weapon, parent)
@@ -320,6 +353,7 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 		if self.quickThrow then
 			self.quickThrow.self:doDelayedEvaluate()
 		end
+		
 		--Universal Recoil Compatibility
 		if self.isUsingURM then
 			self.URM:AssignWeaponStats(newWeapon)
