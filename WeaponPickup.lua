@@ -325,7 +325,9 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 		-- Overlap Check
 		for _,wep in pairs(Player.actor.weaponSlots) do
 			if (wep.weaponEntry.slot == receivedWeapon.slot) then
-				self:DropWeaponManual(wep)
+				if (self:CanBeDropped(wep)) then
+					self:DropWeaponManual(wep)
+				end
 				break
 			end
 		end
