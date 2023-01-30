@@ -42,6 +42,9 @@ function WeaponPickup:Start()
 	self.dropDistanceEnabled = self.script.mutator.GetConfigurationBool("dropByDistance")
 	self.dropDistance = self.script.mutator.GetConfigurationFloat("dropDistance")
 
+	self.freezePhysicsWhenStopped = self.script.mutator.GetConfigurationBool("freezePhysicsWhenStopped")
+	self.freezePhysicsDistance = self.script.mutator.GetConfigurationFloat("freezePhysicsDistance")
+
 	-- Keybinds
 	self.pickupKey = string.lower(self.script.mutator.GetConfigurationString("pickupKey"))
 	self.dropKey = string.lower(self.script.mutator.GetConfigurationString("dropKey"))
