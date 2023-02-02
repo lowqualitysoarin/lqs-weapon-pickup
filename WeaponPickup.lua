@@ -428,6 +428,9 @@ function WeaponPickup:DefaultDropGearSelected(selectedSlot)
 	local pickupData = self.currentPickupData
 	local playerSlots = Player.actor.weaponSlots
 
+	-- Reset HUD
+	self:ResetHUD()
+
 	-- Only for the default pickup system
 	if (selectedSlot == 2) then
 		if (not self:IsLargeGear(pickupData[1])) then
@@ -522,9 +525,6 @@ function WeaponPickup:DefaultDropGearSelected(selectedSlot)
 		-- Finish Pickup System
 		self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
 	end
-
-	-- Reset HUD
-	self:ResetHUD()
 end
 
 function WeaponPickup:IsLargeGear(weapon)
@@ -580,12 +580,12 @@ function WeaponPickup:AnarchyDropWeaponSelected(selectedSlot)
 		end
 	end
 
+	-- Reset HUD
+	self:ResetHUD()
+
 	-- Give the weapon
 	Player.actor.EquipNewWeaponEntry(pickupData[1], selectedSlot, true)
 	self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
-
-	-- Reset HUD
-	self:ResetHUD()
 end
 
 function WeaponPickup:ResetHUD()
