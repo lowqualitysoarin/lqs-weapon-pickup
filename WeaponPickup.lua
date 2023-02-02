@@ -9,6 +9,15 @@ function WeaponPickup:Start()
 	-- Base
 	self.weaponBoxCollider = self.targets.cubeCollider
 
+	-- HUD
+	self.canvas = self.targets.canvas
+
+	self.defaultHUD = self.targets.hud
+	self.anarchyHUD = self.targets.anarchyHud
+
+	anarchy = self.targets.anarchyInv.GetComponent(ScriptedBehaviour).self
+	standard = self.targets.defaultInv.GetComponent(ScriptedBehaviour).self
+
 	-- Rigid Force
 	self.throwForce = 18.7
 	self.upwardForce = 8.5
@@ -16,6 +25,8 @@ function WeaponPickup:Start()
 	-- Data Setup
 	self.droppedWeapons = {}
 	self.droppedIndex = 1
+
+	self.currentPickupData = {}
 
 	self.dataObject = self.targets.emptyCopy
 
@@ -45,6 +56,8 @@ function WeaponPickup:Start()
 	self.freezePhysicsWhenStopped = self.script.mutator.GetConfigurationBool("freezePhysicsWhenStopped")
 	self.freezePhysicsDistance = self.script.mutator.GetConfigurationFloat("freezePhysicsDistance")
 
+	self.anarchyMode = self.script.mutator.GetConfigurationBool("anarchyMode")
+
 	-- Keybinds
 	self.pickupKey = string.lower(self.script.mutator.GetConfigurationString("pickupKey"))
 	self.dropKey = string.lower(self.script.mutator.GetConfigurationString("dropKey"))
@@ -72,6 +85,12 @@ function WeaponPickup:Start()
 	else
 		print("Not using URM")
 	end
+
+	-- Finishing Touches
+	self.anarchyHUD.gameObject.SetActive(false)
+	self.defaultHUD.gameObject.SetActive(false)
+
+	self.canvas.gameObject.SetActive(false)
 end
 
 function WeaponPickup:OnActorDied(actor)
@@ -325,44 +344,253 @@ function WeaponPickup:PickUpWeaponStart(weapon)
 
 		local receivedWeapon = self.droppedWeapons[tonumber(weaponIndex.gameObject.name)]
 
-		-- Overlap Check
-		for _,wep in pairs(Player.actor.weaponSlots) do
-			if (wep.weaponEntry.slot == receivedWeapon.slot) then
-				if (self:CanBeDropped(wep)) then
-					self:DropWeaponManual(wep)
+		-- Assign Weapon
+		if (not self.anarchyMode) then
+			-- Regular Pickup System
+			-- Weapons go to their proper slots
+			self:DefaultPickupSystem(receivedWeapon, weapon, weaponAmmo, weaponSpareAmmo)
+		else
+			-- Anarchy Pickup System
+			-- You can put weapons in any slots
+			self:AnarchyPickupSystem(receivedWeapon, weapon, weaponAmmo, weaponSpareAmmo)
+		end
+	end
+end
+
+function WeaponPickup:DefaultPickupSystem(receivedWeapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
+	-- The Default Pickup System
+	-- Overlap Check
+	for _,wep in pairs(Player.actor.weaponSlots) do
+		if (wep.weaponEntry.slot == receivedWeapon.slot and receivedWeapon.slot ~= WeaponSlot.Gear and receivedWeapon.slot ~= WeaponSlot.LargeGear) then
+			if (self:CanBeDropped(wep)) then
+				self:DropWeaponManual(wep)
+			end
+			break
+		end
+	end
+
+	-- Applying
+	if (receivedWeapon.slot == WeaponSlot.Primary) then
+		Player.actor.EquipNewWeaponEntry(receivedWeapon, 0, true)
+		self:PickupWeaponFinish(Player.actor.activeWeapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
+	elseif (receivedWeapon.slot == WeaponSlot.Secondary) then
+		Player.actor.EquipNewWeaponEntry(receivedWeapon, 1, true)
+		self:PickupWeaponFinish(Player.actor.activeWeapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
+	end
+
+	-- If the weapon is a gear or large gear then open up the inventory
+	if (receivedWeapon.slot == WeaponSlot.Gear or receivedWeapon.slot == WeaponSlot.LargeGear) then
+		-- Inventory setup
+		self.canvas.gameObject.SetActive(true)
+
+		self.anarchyHUD.gameObject.SetActive(false)
+		self.defaultHUD.gameObject.SetActive(true)
+
+		Screen.UnlockCursor()
+		Input.DisableNumberRowInputs()
+
+		-- Setup Loadout Icons
+		standard:SetupLoadout()
+
+		-- Pass the current pickup data
+		self.currentPickupData = {
+			receivedWeapon,
+			weaponDrop,
+			weaponAmmo,
+			weaponSpareAmmo
+		}
+	end
+end
+
+function WeaponPickup:DefaultDropGearSelected(selectedSlot)
+	-- Pickup data array
+	local pickupData = self.currentPickupData
+	local playerSlots = Player.actor.weaponSlots
+
+	-- Only for the default pickup system
+	if (selectedSlot == 2) then
+		if (not self:IsLargeGear(pickupData[1])) then
+			-- Drop gear if the slot has one
+			if (playerSlots[3] ~= nil) then
+				if (self:CanBeDropped(playerSlots[3])) then
+					self:DropWeaponManual(playerSlots[3])
 				end
-				break
+			end
+		
+			-- Pickup new gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 2, true)
+		else
+			-- Drop two gears for the large one
+			if (playerSlots[4] ~= nil) then
+				if (self:CanBeDropped(playerSlots[4])) then
+					self:DropWeaponManual(playerSlots[4])
+				end
+			end
+
+			if (playerSlots[5] ~= nil) then
+				if (self:CanBeDropped(playerSlots[5])) then
+					self:DropWeaponManual(playerSlots[5])
+				end
+			end
+
+			-- Pickup large gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 3, true)
+		end
+
+		self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
+	elseif (selectedSlot == 3) then
+		if (not self:IsLargeGear(pickupData[1])) then
+			-- Drop gear if the slot has one
+			if (playerSlots[4] ~= nil) then
+				if (self:CanBeDropped(playerSlots[4])) then
+					self:DropWeaponManual(playerSlots[4])
+				end
+			end
+		
+			-- Pickup new gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 3, true)
+		else
+			-- Drop two gears for the large one
+			if (playerSlots[4] ~= nil) then
+				if (self:CanBeDropped(playerSlots[4])) then
+					self:DropWeaponManual(playerSlots[4])
+				end
+			end
+
+			if (playerSlots[5] ~= nil) then
+				if (self:CanBeDropped(playerSlots[5])) then
+					self:DropWeaponManual(playerSlots[5])
+				end
+			end
+
+			-- Pickup large gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 3, true)
+		end
+
+		-- Finish Pickup System
+		self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
+	elseif (selectedSlot == 4) then
+		if (not self:IsLargeGear(pickupData[1])) then
+			-- Drop gear if the slot has one
+			if (playerSlots[5] ~= nil) then
+				if (self:CanBeDropped(playerSlots[5])) then
+					self:DropWeaponManual(playerSlots[5])
+				end
+			end
+	
+			-- Pickup new gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 4, true)
+		else
+			-- Drop two gears for the large one
+			if (playerSlots[4] ~= nil) then
+				if (self:CanBeDropped(playerSlots[4])) then
+					self:DropWeaponManual(playerSlots[4])
+				end
+			end
+
+			if (playerSlots[5] ~= nil) then
+				if (self:CanBeDropped(playerSlots[5])) then
+					self:DropWeaponManual(playerSlots[5])
+				end
+			end
+
+			-- Pickup large gear
+			Player.actor.EquipNewWeaponEntry(pickupData[1], 3, true)
+		end
+
+		-- Finish Pickup System
+		self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
+	end
+
+	-- Reset HUD
+	self:ResetHUD()
+end
+
+function WeaponPickup:IsLargeGear(weapon)
+	if (weapon ~= nil) then
+		if (weapon.slot == WeaponSlot.LargeGear) then
+			return true
+		else
+			return false
+		end
+	else
+		return false
+	end
+end
+
+function WeaponPickup:AnarchyPickupSystem(receivedWeapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
+	-- Anarchy Pickup System
+	-- Setup Some Stuff
+	self.canvas.gameObject.SetActive(true)
+
+	self.anarchyHUD.gameObject.SetActive(true)
+	self.defaultHUD.gameObject.SetActive(false)
+
+	Screen.UnlockCursor()
+	Input.DisableNumberRowInputs()
+
+	-- Setup Loadout Icons
+	anarchy:SetupLoadout()
+
+	-- Pass the current pickup data
+	self.currentPickupData = {
+		receivedWeapon,
+		weaponDrop,
+		weaponAmmo,
+		weaponSpareAmmo
+	}
+end
+
+function WeaponPickup:AnarchyDropWeaponSelected(selectedSlot)
+	-- Only For Anarchy Pickup System
+	-- Pickup data array
+	local pickupData = self.currentPickupData
+	local playerSlots = Player.actor.weaponSlots
+
+	-- Drop weapon in the selected slot if its valid
+	for _,wep in pairs(playerSlots) do
+		if (wep.slot == selectedSlot) then
+			if (self:CanBeDropped(wep)) then
+				self:DropWeaponManual(wep)
 			end
 		end
+	end
 
-		-- Applying
-		if (receivedWeapon.slot == WeaponSlot.Primary) then
-			Player.actor.EquipNewWeaponEntry(receivedWeapon, 0, true)
-		elseif (receivedWeapon.slot == WeaponSlot.Secondary) then
-			Player.actor.EquipNewWeaponEntry(receivedWeapon, 1, true)
-		elseif (receivedWeapon.slot == WeaponSlot.Gear) then
-			Player.actor.EquipNewWeaponEntry(receivedWeapon, 2, true)
-		elseif (receivedWeapon.slot == WeaponSlot.LargeGear) then
-			Player.actor.EquipNewWeaponEntry(receivedWeapon, 4, true)
-		end
+	-- Give the weapon
+	Player.actor.EquipNewWeaponEntry(pickupData[1], selectedSlot, true)
+	self:PickupWeaponFinish(Player.actor.activeWeapon, pickupData[2], pickupData[3], pickupData[4])
 
-		local newWeapon = Player.actor.activeWeapon
+	-- Reset HUD
+	self:ResetHUD()
+end
+
+function WeaponPickup:ResetHUD()
+	-- Self Explanatory
+	self.anarchyHUD.gameObject.SetActive(false)
+	self.defaultHUD.gameObject.SetActive(false)
+
+	self.canvas.gameObject.SetActive(false)
+
+	Screen.LockCursor()
+	Input.EnableNumberRowInputs()
+end
+
+function WeaponPickup:PickupWeaponFinish(weapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
+	-- Apply Weapon Ammo Data
+	weapon.ammo = tonumber(weaponAmmo.gameObject.name)
+	weapon.spareAmmo = tonumber(weaponSpareAmmo.gameObject.name)
+
+	-- Destroy Pickup
+	GameObject.Destroy(weaponDrop)
+
+	-- Quick Throw Compatibility
+	if self.quickThrow then
+		self.quickThrow.self:doDelayedEvaluate()
+	end
 	
-		newWeapon.ammo = tonumber(weaponAmmo.gameObject.name)
-		newWeapon.spareAmmo = tonumber(weaponSpareAmmo.gameObject.name)
-
-		-- Destroy Pickup
-		GameObject.Destroy(weapon)
-
-		--Quick Throw Compatibility
-		if self.quickThrow then
-			self.quickThrow.self:doDelayedEvaluate()
-		end
-		
-		--Universal Recoil Compatibility
-		if self.isUsingURM then
-			self.URM:AssignWeaponStats(newWeapon)
-		end
+	-- Universal Recoil Compatibility
+	if self.isUsingURM then
+		self.URM:AssignWeaponStats(weapon)
 	end
 end
 
