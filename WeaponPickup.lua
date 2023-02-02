@@ -166,10 +166,15 @@ function WeaponPickup:Update()
 		if (self.currentPickupData[2] ~= nil and self.isMenuOpen) then
 			local distanceToPickup = (Player.actor.transform.position - self.currentPickupData[2].transform.position).magnitude
 
-			if (distanceToPickup > 1.95) then
+			if (distanceToPickup > 1.65) then
 				self:ResetHUD()
 			end
 		end
+	end
+
+	-- Closes the menu when the player dies
+	if (Player.actor.isDead) then
+		self:ResetHUD()
 	end
 end
 
