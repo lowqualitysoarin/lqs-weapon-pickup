@@ -18,6 +18,8 @@ function WeaponPickup:Start()
 	anarchy = self.targets.anarchyInv.GetComponent(ScriptedBehaviour).self
 	standard = self.targets.defaultInv.GetComponent(ScriptedBehaviour).self
 
+	self.isMenuOpen = false
+
 	-- Rigid Force
 	self.throwForce = 18.7
 	self.upwardForce = 8.5
@@ -155,6 +157,17 @@ function WeaponPickup:Update()
 				self:PickUpWeaponStart(currentPickup)
 				self.canPickup = false
 				self.script.StartCoroutine("PickupDelay")
+			end
+		end
+	end
+
+	-- Close the menu when the player gets far from the pickup
+	if (#self.currentPickupData > 0) then
+		if (self.currentPickupData[2] ~= nil and self.isMenuOpen) then
+			local distanceToPickup = (Player.actor.transform.position - self.currentPickupData[2].transform.position).magnitude
+
+			if (distanceToPickup > 1.95) then
+				self:ResetHUD()
 			end
 		end
 	end
@@ -389,6 +402,9 @@ function WeaponPickup:DefaultPickupSystem(receivedWeapon, weaponDrop, weaponAmmo
 		Screen.UnlockCursor()
 		Input.DisableNumberRowInputs()
 
+		-- Trigger bool
+		self.isMenuOpen = true
+
 		-- Setup Loadout Icons
 		standard:SetupLoadout()
 
@@ -529,6 +545,9 @@ function WeaponPickup:AnarchyPickupSystem(receivedWeapon, weaponDrop, weaponAmmo
 	Screen.UnlockCursor()
 	Input.DisableNumberRowInputs()
 
+	-- Trigger bool
+	self.isMenuOpen = true
+
 	-- Setup Loadout Icons
 	anarchy:SetupLoadout()
 
@@ -573,6 +592,9 @@ function WeaponPickup:ResetHUD()
 
 	Screen.LockCursor()
 	Input.EnableNumberRowInputs()
+
+	-- Trigger bool
+	self.isMenuOpen = false
 end
 
 function WeaponPickup:PickupWeaponFinish(weapon, weaponDrop, weaponAmmo, weaponSpareAmmo)
