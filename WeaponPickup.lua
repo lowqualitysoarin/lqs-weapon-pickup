@@ -169,7 +169,11 @@ function WeaponPickup:Update()
 			if (distanceToPickup > 1.65) then
 				self:ResetHUD()
 			end
+		else
+			self:ResetHUD()
 		end
+	else
+		self:ResetHUD()
 	end
 
 	-- Closes the menu when the player dies
