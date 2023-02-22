@@ -5,6 +5,10 @@ local pickupDetected = false
 local pickupRayCast = nil
 local alreadyChecked = false
 
+function WeaponPickup:Awake()
+	self.onWeaponPickUpListeners = {}
+end
+
 function WeaponPickup:Start()
 	-- Base
 	self.weaponBoxCollider = self.targets.cubeCollider
@@ -623,6 +627,8 @@ function WeaponPickup:PickupWeaponFinish(weapon, weaponDrop, weaponAmmo, weaponS
 	if self.isUsingURM then
 		self.URM:AssignWeaponStats(weapon)
 	end
+
+	self:InvokeOnWeaponPickupEvent(weapon)
 end
 
 -- Will always return true if neither mod is present
@@ -630,4 +636,18 @@ function WeaponPickup:CompatChecks()
 	if self.quickThrow and self.quickThrow.self.isThrowing then return false end
 	if self.playerArmor and self.playerArmor.self.isInArmorPlateMode then return false end
 	return true
+end
+
+function WeaponPickup:AddOnWeaponPickupListener(owner,func)
+	self.onWeaponPickUpListeners[owner] = func
+end
+
+function WeaponPickup:RemoveOnWeaponPickupListener(owner)
+	self.onWeaponPickUpListeners[owner] = nil
+end
+
+function WeaponPickup:InvokeOnWeaponPickupEvent(weapon)
+	for owner, func in pairs(self.onWeaponPickUpListeners) do
+		func(weapon)
+	end
 end
