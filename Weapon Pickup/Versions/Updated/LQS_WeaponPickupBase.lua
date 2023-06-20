@@ -307,7 +307,7 @@ function LQS_WeaponPickupBase:DefaultPickupSystem(receivedData)
     -- The default pickup system
     -- Overlap Check
 	for _,wep in pairs(Player.actor.weaponSlots) do
-		if (wep.weaponEntry.slot == receivedData.weaponEntry.slot and self:IsGear(receivedData.weaponEntry) and self:IsLargeGear(receivedData.weaponEntry)) then
+		if (wep.weaponEntry.slot == receivedData.weaponEntry.slot and not self:IsGear(receivedData.weaponEntry) and not self:IsLargeGear(receivedData.weaponEntry)) then
 			if (self:CanBeDropped(wep)) then
 				self:DropWeapon(Player.actor, wep, true)
 			end
