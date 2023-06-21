@@ -43,7 +43,7 @@ function LQS_StandardSelection:Update()
 		else
 			self:Gear2Selected()
 		end
-	elseif (Input.GetKeyDown(KeyCode.Alpha5)) then
+	elseif (Input.GetKeyDown(KeyCode.Alpha5) and not self.hasLargeGear) then
 		self:Gear3Selected()
 	elseif (Input.GetKeyDown(KeyCode.Alpha6)) then
         self.weaponPickupBase:ResetHUD()
@@ -64,14 +64,13 @@ function LQS_StandardSelection:SetupLoadout()
         end
     end
 
+	self.largeGear.gameObject.SetActive(false)
+	self.gear2.gameObject.SetActive(true)
+	self.gear3.gameObject.SetActive(true)
+
+	self.gear2Icon.sprite = self.noneIcon
     if (loadout[4]) then
 		local wep = loadout[4].weaponEntry
-		
-		self.largeGear.gameObject.SetActive(false)
-		self.gear2.gameObject.SetActive(true)
-		self.gear3.gameObject.SetActive(true)
-
-		self.gear2Icon.sprite = self.noneIcon
 		if (wep.uiSprite) then
 			self.gear2Icon.sprite = wep.uiSprite
 		end

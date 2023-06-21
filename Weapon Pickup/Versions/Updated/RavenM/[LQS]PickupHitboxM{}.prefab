@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 7310594427354789917}
   - component: {fileID: -3566705854344462199}
   m_Layer: 0
-  m_Name: '[LQS]PickupHitbox{}'
+  m_Name: '[LQS]PickupHitboxM{}'
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -62,7 +62,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 63cd434671520894090d076b5962d3e9, type: 2}
+  - {fileID: 2100000, guid: 1e81d386ad80998499656ed2de2d521a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -125,6 +125,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f8ca71ca01d2fb4098cb42abc5eceb7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  source: {fileID: 2213920135882650261, guid: d374916d6fb87a24f93bded184646b69, type: 3}
+  source: {fileID: 2213920135882650261, guid: 4995f6cc868ca5f42b2eca678d4bbf7b, type: 3}
   behaviour: 
   targets: []

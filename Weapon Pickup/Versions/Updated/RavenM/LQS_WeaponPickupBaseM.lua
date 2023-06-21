@@ -1,15 +1,22 @@
 -- low_quality_soarin, RadioactiveJellyfish © 2023-2024
--- Weapon Pickup Rewrite, SP version.
-behaviour("LQS_WeaponPickupBase")
+-- Weapon Pickup Rewrite, RavenM version.
+behaviour("LQS_WeaponPickupBaseM")
 
-function LQS_WeaponPickupBase:Awake()
+function LQS_WeaponPickupBaseM:Awake()
+    -- RavenM shit
+    -- RandomID, the real id is only from the host. And the id is always a string
+    -- It will be converted later into a int for sending packets
+    self.weaponPickupBaseID = math.random(0, 100) .. math.random(0, 100) .. math.random(0, 100) .. math.random(0, 100)
+    self.curIDIndex = 0
+
 	-- From RadioactiveJellyfish: Table of functions for event listeners
 	self.onWeaponPickUpListeners = {}
 end
 
-function LQS_WeaponPickupBase:Start()
+function LQS_WeaponPickupBaseM:Start()
 	-- Base
     self.pickupObject = self.targets.pickupObject
+    self.emptyCopy = self.targets.emptyCopy
 
     -- HUD
     self.canvas = self.targets.canvas
@@ -58,9 +65,11 @@ function LQS_WeaponPickupBase:Start()
 
 	-- Listeners
 	GameEvents.onActorDied.AddListener(self, "OnActorDied")
+    GameEventsOnline.onSendPacket.AddListener(self, "SendPacket")
+    GameEventsOnline.onReceivePacket.AddListener(self,"ReceivePacket")
 
     -- Vars
-    self.queuePickupData = nil
+    self.queuePickupData = {}
     self.isMenuOpen = false
 
 	-- Finishing touches
@@ -71,9 +80,51 @@ function LQS_WeaponPickupBase:Start()
     self.canvas.SetActive(false)
 	self.anarchyHUD.SetActive(false)
 	self.defaultHUD.SetActive(false)
+
+    -- Share Instance
+    _G.LQSWeaponPickupBase = self.gameObject.GetComponent(ScriptedBehaviour).self
 end
 
-function LQS_WeaponPickupBase:CheckKeyCode(key)
+function LQS_WeaponPickupBaseM:SendPacket(id, data)
+    print("Packet Sent:",id, data)
+
+    -- I don't know anything about networking, soo here goes trying..
+    self:DestroyPickup(data)
+    self:UpdateDropID(data)
+end
+
+function LQS_WeaponPickupBaseM:ReceivePacket(id, data)
+    print("Packet Received:", id, data)
+
+    -- Same thing as send packet..
+    self:DestroyPickup(data)
+    self:UpdateDropID(data)
+end
+
+function LQS_WeaponPickupBaseM:UpdateDropID(data)
+    -- Basically just updates the drop ID
+    local unwrappedData = self:UnwrapPacket(data)
+
+    if (#unwrappedData == 0) then return end
+    if (unwrappedData[1] ~= "lqswpbase") then return end
+    if (unwrappedData[3] ~= "updateidindex") then return end
+
+    if (unwrappedData[2]) then
+        self.curIDIndex = tonumber(unwrappedData[2])
+    end
+end
+
+function LQS_WeaponPickupBaseM:UnwrapPacket(data)
+    -- My own unwrapping method
+    -- It always uses ";;" as a seperator
+    local dataFinal = {}
+    for word in string.gmatch(data, "([^;;]+)") do
+        dataFinal[#dataFinal+1] = word
+    end
+    return dataFinal
+end
+
+function LQS_WeaponPickupBaseM:CheckKeyCode(key)
 	-- From my badycam mutator
 	-- Basically converts it to a keycode when its a unique one
     
@@ -135,45 +186,35 @@ function LQS_WeaponPickupBase:CheckKeyCode(key)
     return key
 end
 
-function LQS_WeaponPickupBase:Compatibility()
+function LQS_WeaponPickupBaseM:Compatibility()
     -- Redoing some of the compat checks by RadioactiveJelly
-    -- Quick Throw
     local quickThrowObj = self.gameObject.Find("QuickThrow")
 	if quickThrowObj then
 		self.quickThrow = quickThrowObj.GetComponent(ScriptedBehaviour)
-        print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base</color>: Quick Throw found!")
+        print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base: Quick Throw found!")
 	end
 
-    -- Player Armor
 	local armorObj = self.gameObject.Find("PlayerArmor")
 	if armorObj then
 		self.playerArmor = armorObj.GetComponent(ScriptedBehaviour)
-        print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base</color>: Player Armor found!")
+        print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base: Player Armor found!")
 	end
 
-    -- Universal Recoil Mutator
 	local urmObj = GameObject.find("RecoilPrefab(Clone)")
 	if (urmObj) then
-		self.URM = urmObj.gameObject.GetComponent(ScriptedBehaviour)
-		print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base</color>: Universal Recoil Mutator found!")
+		self.URM = self.URM.gameObject.GetComponent(ScriptedBehaviour)
+		print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base: Universal Recoil Mutator found!")
 	end
-
-    -- Soarin's Bodycam
-    local bodycamObj = GameObject.Find("[LQS]Bodycam(Clone)")
-    if (bodycamObj) then
-        self.bodycamBase = bodycamObj.GetComponent(ScriptedBehaviour)
-        print("[<color=aqua>LQS</color>]<color=yellow>Weapon Pickup Base</color>: Soarin's Bodycam found!")
-    end
 end
 
 -- From RadioactiveJellyfish: Will always return true if neither mod is present
-function LQS_WeaponPickupBase:CompatChecks()
+function LQS_WeaponPickupBaseM:CompatChecks()
 	if self.quickThrow and self.quickThrow.self.isThrowing then return false end
 	if self.playerArmor and self.playerArmor.self.isInArmorPlateMode then return false end
 	return true
 end
 
-function LQS_WeaponPickupBase:OnActorDied(actor)
+function LQS_WeaponPickupBaseM:OnActorDied(actor)
     -- Drop distance check
     if (self.dropDistanceEnabled) then
         local distanceToPlayer = Vector3.Distance(actor.transform.position, Player.actor.transform.position)
@@ -204,7 +245,7 @@ function LQS_WeaponPickupBase:OnActorDied(actor)
     end
 end
 
-function LQS_WeaponPickupBase:Update()
+function LQS_WeaponPickupBaseM:Update()
 	-- Main
     self:WeaponPickupMain()
 
@@ -212,15 +253,15 @@ function LQS_WeaponPickupBase:Update()
     self:QueueChecker()
 end
 
-function LQS_WeaponPickupBase:QueueChecker()
+function LQS_WeaponPickupBaseM:QueueChecker()
     if (not Player.actor) then return end
-    if (self.queuePickupData and not self.queuePickupData.gameObject) then self:ResetHUD() return end
+    if (self.queuePickupData[5]) then self:ResetHUD() return end
 
     -- Idk what to call this lmfaoo, it basically the thing that handles the selection menus.
     -- Like if the player moves away from the pickup the menu automatically closes, or if the weapon drop is destroyed.
     local player = Player.actor
     if (self.isMenuOpen and player and not player.isDead) then
-        local distanceToPickup = self.queuePickupData.transform.position - player.transform.position
+        local distanceToPickup = self.queuePickupData[5].transform.position - player.transform.position
         if (distanceToPickup.sqrMagnitude > 1.65) then
             self:ResetHUD()
         end
@@ -229,7 +270,7 @@ function LQS_WeaponPickupBase:QueueChecker()
     end
 end
 
-function LQS_WeaponPickupBase:WeaponPickupMain()
+function LQS_WeaponPickupBaseM:WeaponPickupMain()
     -- The base stuff
     local activeWeapon = Player.actor.activeWeapon
     local player = Player.actor
@@ -244,17 +285,10 @@ function LQS_WeaponPickupBase:WeaponPickupMain()
     end
 end
 
-function LQS_WeaponPickupBase:Pickup()
+function LQS_WeaponPickupBaseM:Pickup()
     -- Picks up the weapon
     -- Launch a raycast
-    -- Gets the proper ray for the raycast
     local ray = PlayerCamera.fpCamera.ViewportPointToRay(Vector3(0.5, 0.5, 0))
-    if (self:BodycamActive()) then
-        local bodycamMain = self.bodycamBase.self.bodyCam.gameObject.GetComponent(Camera)
-        ray = bodycamMain.ViewportPointToRay(Vector3(0.5, 0.5, 0))
-    end
-
-    -- Launch Ray
     local pickupRay = Physics.Raycast(ray, self.pickupRange, RaycastTarget.Default)
 
     -- Check if its a pickup
@@ -268,17 +302,7 @@ function LQS_WeaponPickupBase:Pickup()
     self.script.StartCoroutine(self:PickupCooldown())
 end
 
-function LQS_WeaponPickupBase:BodycamActive()
-    -- Basically checkss if the bodycam mod exists or is it active
-    if (self.bodycamBase) then
-        if (self.bodycamBase.self.useBodyCam) then
-            return true
-        end
-    end
-    return false
-end
-
-function LQS_WeaponPickupBase:PickupCooldown()
+function LQS_WeaponPickupBaseM:PickupCooldown()
     -- Pickup Cooldown, soo you can't pickup your old weapon accidentally
     -- when mashing the pickup key way too much.
     return function()
@@ -287,22 +311,46 @@ function LQS_WeaponPickupBase:PickupCooldown()
     end
 end
 
-function LQS_WeaponPickupBase:PickupWeapon(obj)
+function LQS_WeaponPickupBaseM:PickupWeapon(obj)
     if (not obj) then return end
-    local dataScript = obj.GetComponent(ScriptedBehaviour).self
-    if (not dataScript) then return end
+
+    -- I have to do what I did back at the legacy weapon pickup thing
+    -- Basically extracting everything from the drop
+    local wep = self:FindWeapon(obj.transform.GetChild(1).gameObject.GetComponent(Weapon))
+    local ammo = tonumber(obj.transform.GetChild(2).gameObject.name)
+    local spareAmmo = tonumber(obj.transform.GetChild(3).gameObject.name)
+    local dropID = obj.transform.GetChild(4).gameObject.name
+
+    local data = {
+        wep,
+        ammo,
+        spareAmmo,
+        dropID,
+        obj
+    }
 
     -- Picks up the weapon
     if (not self.anarchyMode) then
         -- Default Pickup System
-        self:DefaultPickupSystem(dataScript)
+        self:DefaultPickupSystem(data)
     else
         -- Anarchy Pickup System
-        self:AnarchyPickupSystem(dataScript)
+        self:AnarchyPickupSystem(data)
     end
 end
 
-function LQS_WeaponPickupBase:AnarchyPickupSystem(receivedData)
+function LQS_WeaponPickupBaseM:FindWeapon(targetWep)
+    -- This basically searches for the given weapon's weaponEntry
+    -- It start with checking if the prefab are the same, else then it doesn't exists or rf moment
+    for _,wep in pairs(WeaponManager.allWeapons) do
+        if (wep.uiSprite == targetWep.uiSprite) then
+            print("match found!!")
+            return wep
+        end
+    end
+end
+
+function LQS_WeaponPickupBaseM:AnarchyPickupSystem(receivedData)
     -- The anarchy pickup system
     -- Queue weapon and enable selection hud, because this allows you 
     -- to put your weapon on any slots
@@ -310,7 +358,7 @@ function LQS_WeaponPickupBase:AnarchyPickupSystem(receivedData)
     self:EnableHUD("anarchy")
 end
 
-function LQS_WeaponPickupBase:AnarchyDropWeaponSelected(selectedSlot)
+function LQS_WeaponPickupBaseM:AnarchyDropWeaponSelected(selectedSlot)
 	-- Only For Anarchy Pickup System
 	-- Pickup data array
 	local playerSlots = Player.actor.weaponSlots
@@ -326,15 +374,15 @@ function LQS_WeaponPickupBase:AnarchyDropWeaponSelected(selectedSlot)
 	end
 
 	-- Give the weapon
-	Player.actor.EquipNewWeaponEntry(self.queuePickupData.weaponEntry, selectedSlot, true)
+	Player.actor.EquipNewWeaponEntry(self.queuePickupData[1].weaponEntry, selectedSlot, true)
 	self:PickupWeaponFinal(Player.actor.activeWeapon, self.queuePickupData)
 end
 
-function LQS_WeaponPickupBase:DefaultPickupSystem(receivedData)
+function LQS_WeaponPickupBaseM:DefaultPickupSystem(receivedData)
     -- The default pickup system
     -- Overlap Check
 	for _,wep in pairs(Player.actor.weaponSlots) do
-		if (wep.weaponEntry.slot == receivedData.weaponEntry.slot and not self:IsGear(receivedData.weaponEntry) and not self:IsLargeGear(receivedData.weaponEntry)) then
+		if (wep.weaponEntry.slot == receivedData[1].slot and not self:IsGear(receivedData[1]) and not self:IsLargeGear(receivedData[1])) then
 			if (self:CanBeDropped(wep)) then
 				self:DropWeapon(Player.actor, wep, true)
 			end
@@ -345,10 +393,10 @@ function LQS_WeaponPickupBase:DefaultPickupSystem(receivedData)
 	-- Get the targetSlot
     -- If it fails to get the targetSlot then its possibly a gear or a heavy weapon
     local targetSlot = nil
-	if (receivedData.weaponEntry.slot == WeaponSlot.Primary) then
+	if (receivedData[1].slot == WeaponSlot.Primary) then
         -- Primary
 		targetSlot = 0
-	elseif (receivedData.weaponEntry.slot == WeaponSlot.Secondary) then
+	elseif (receivedData[1].slot == WeaponSlot.Secondary) then
         -- Secondary
 		targetSlot = 1
     else
@@ -362,12 +410,12 @@ function LQS_WeaponPickupBase:DefaultPickupSystem(receivedData)
 
     -- Apply the weapon
     if (targetSlot) then
-        Player.actor.EquipNewWeaponEntry(receivedData.weaponEntry, targetSlot, true)
+        Player.actor.EquipNewWeaponEntry(receivedData[1], targetSlot, true)
 	    self:PickupWeaponFinal(Player.actor.activeWeapon, receivedData)
     end
 end
 
-function LQS_WeaponPickupBase:DefaultDropGearSelected(selection)
+function LQS_WeaponPickupBaseM:DefaultDropGearSelected(selection)
     -- Applies the selected slot
     local playerSlots = Player.actor.weaponSlots
     local targetSlot = selection
@@ -375,7 +423,7 @@ function LQS_WeaponPickupBase:DefaultDropGearSelected(selection)
 
     -- Now less messy! I guess..
     -- Check if the weapon is a heavy weapon
-    if (self:IsLargeGear(self.queuePickupData.weaponEntry)) then
+    if (self:IsLargeGear(self.queuePickupData[1].weaponEntry)) then
         -- If so then drop the two last gear slots to make space for the heavy one
         -- if the two ones do exists
         if (self:CanBeDropped(playerSlots[4])) then
@@ -400,11 +448,11 @@ function LQS_WeaponPickupBase:DefaultDropGearSelected(selection)
     end
 
     -- Apply
-    Player.actor.EquipNewWeaponEntry(self.queuePickupData.weaponEntry, targetSlot, true)
+    Player.actor.EquipNewWeaponEntry(self.queuePickupData[1].weaponEntry, targetSlot, true)
 	self:PickupWeaponFinal(Player.actor.activeWeapon, self.queuePickupData)
 end
 
-function LQS_WeaponPickupBase:EnableHUD(hudType)
+function LQS_WeaponPickupBaseM:EnableHUD(hudType)
     -- Self explanatory.. Again
     Screen.UnlockCursor()
     Input.DisableNumberRowInputs()
@@ -420,7 +468,7 @@ function LQS_WeaponPickupBase:EnableHUD(hudType)
     end
 end
 
-function LQS_WeaponPickupBase:ResetHUD()
+function LQS_WeaponPickupBaseM:ResetHUD()
 	-- Self explanatory
     self.canvas.SetActive(false)
     self.anarchyHUD.SetActive(false)
@@ -430,16 +478,17 @@ function LQS_WeaponPickupBase:ResetHUD()
 	self.isMenuOpen = false
 end
 
-function LQS_WeaponPickupBase:PickupWeaponFinal(weapon, data)
+function LQS_WeaponPickupBaseM:PickupWeaponFinal(weapon, data)
     -- Finalized action after picking up a weapon
     -- Apply ammo and spareAmmo count
-    weapon.ammo = data.weaponAmmo
-    weapon.spareAmmo = data.weaponSpareAmmo
-
-    self.script.StartCoroutine(self:ApplyAltWeaponsAmmoAndSpareAmmo(weapon, data))
+    weapon.ammo = data[2]
+    weapon.spareAmmo = data[3]
 
     -- Destroy pickup
-    GameObject.Destroy(data.gameObject)
+    -- Using packet because look at below damn it..
+    local dropID = tostring(self:UnwrapPacket(data[4])[2])
+    print(dropID)
+    OnlinePlayer.SendPacketToServer("lqswpbase;;" .. dropID .. ";;weaponpickedup", tonumber(self.weaponPickupBaseID), true)
 
     -- Trigger Compats made by RadioactiveJellyfish
     -- Quick Throw Compatibility
@@ -456,28 +505,36 @@ function LQS_WeaponPickupBase:PickupWeaponFinal(weapon, data)
 	self:InvokeOnWeaponPickupEvent(weapon)
 end
 
-function LQS_WeaponPickupBase:ApplyAltWeaponsAmmoAndSpareAmmo(weapon, data)
-    -- Using a coroutine for this because it strangely thinks that the weapon
-    -- has no subweapons in it despite having some
-    return function()
-        coroutine.yield(WaitForSeconds(0))
-        for index,altWep in pairs(weapon.alternativeWeapons) do
-            altWep.ammo = data.altWeaponAmmo[index]
-            altWep.spareAmmo = data.altWeaponSpareAmmo[index]
+function LQS_WeaponPickupBaseM:DestroyPickup(data)
+    -- Doing this because it needs to be destroyed on all of the clients in the server
+    local unwrappedData = self:UnwrapPacket(data)
+
+    if (#unwrappedData == 0) then return end
+    if (unwrappedData[1] ~= "lqswpbase") then return end
+    if (unwrappedData[3] ~= "weaponpickedup") then return end
+
+    -- Find the object with the same dropID and disable it
+    -- I can't destroy it because it just doesn't work if a destroy function already executed on the despawning system
+    -- Just like a race or something idfk
+    local objToDestroy = GameObject.Find("lqswpbase;;" .. unwrappedData[2] .. ";;dropid")
+    if (objToDestroy) then
+        local objToDestroyFinal = objToDestroy.transform.parent.gameObject
+        if (objToDestroyFinal) then
+            GameObject.Destroy(objToDestroyFinal)
         end
     end
 end
 
-function LQS_WeaponPickupBase:PickupCheck(raycast)
+function LQS_WeaponPickupBaseM:PickupCheck(raycast)
     if (raycast) then
-        if (raycast.collider.gameObject.name == "[LQS]PickupHitbox{}(Clone)") then
+        if (raycast.collider.gameObject.name == "[LQS]PickupHitboxM{}(Clone)") then
             return true
         end
     end
     return false
 end
 
-function LQS_WeaponPickupBase:DropWeapon(actor, weapon, isManual, noForce)
+function LQS_WeaponPickupBaseM:DropWeapon(actor, weapon, isManual, noForce)
     if (not weapon) then return end
 
     -- Drops the weapon
@@ -497,12 +554,25 @@ function LQS_WeaponPickupBase:DropWeapon(actor, weapon, isManual, noForce)
     end
 
     -- Instantiate Pickup Object
-    local weaponDrop = GameObject.Instantiate(self.pickupObject, spawnPos, Quaternion.identity)
-    local weaponAmogus = weapon.weaponEntry.InstantiateImposter(weaponDrop.transform.position, Quaternion.identity)
+    local weaponDrop = GameObject.Instantiate(self.pickupObject, Vector3.zero, Quaternion.identity)
+    local weaponAmogus = GameObject.Instantiate(self:GetTPModel(weapon), weaponDrop.transform.position, Quaternion.identity)
 
     -- Some setups
     self:WeaponPickupObjectSetup(weaponDrop, weaponAmogus)
-    local pickupData = self:SetupPickupData(weaponDrop, weapon)
+    self:SetupPickupData(weaponDrop, weapon)
+
+    -- God damnnnn
+    -- I just want this to fucking work!!!!!
+    local weaponDropFinal = GameObjectM.Instantiate(weaponDrop, spawnPos, Quaternion.identity)
+
+    -- Destroy the obj
+    -- Because this is just a decoy one, the real one is already made
+    GameObject.Destroy(weaponDrop)
+
+    -- Despawning
+    if (self.canDespawn) then
+        GameObject.Destroy(weaponDropFinal, self.despawnTime)
+    end
 
     -- Remove Weapon
     -- If the actor is a player
@@ -512,8 +582,8 @@ function LQS_WeaponPickupBase:DropWeapon(actor, weapon, isManual, noForce)
 
     -- Add force to the rigidbody
     -- If possible...
-    if (targetDropTransform and pickupData and not noForce) then
-        local pickupRB = pickupData.dropRB
+    if (targetDropTransform and weaponDropFinal and not noForce) then
+        local pickupRB = weaponDropFinal.GetComponent(ScriptedBehaviour).self.dropRB
 
         -- Give the actor's velocity to the rigidbody
         pickupRB.velocity = actor.velocity
@@ -526,49 +596,67 @@ function LQS_WeaponPickupBase:DropWeapon(actor, weapon, isManual, noForce)
     end
 end
 
-function LQS_WeaponPickupBase:SetupPickupData(obj, weapon)
+function LQS_WeaponPickupBaseM:GetTPModel(weapon)
+	-- Get The Children Objects
+    -- Jesus please forgive me RavenM doesn't have much support with scripting.
+	local childrenObjects = weapon.gameObject.GetComponentsInChildren(Transform)
+	if (#childrenObjects > 0) then
+		for _,obj in pairs(childrenObjects) do
+			if (obj.gameObject.name ~= "Armature") then
+				if (obj.gameObject.GetComponent(Renderer)) then
+					if (not obj.gameObject.GetComponent(SkinnedMeshRenderer)) then
+						if (obj.gameObject.name ~= "Reload Audio") then
+							if (not obj.gameObject.GetComponent(AudioSource)) then
+								if (obj.transform.childCount > 0) then
+									return obj.gameObject
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+    return nil
+end
+
+function LQS_WeaponPickupBaseM:SetupPickupData(obj, weapon)
     if (not obj) then return end
     if (not weapon) then return end
 
     -- Setups the pickup data
+    -- This is way different than the SP one, this one uses the legacy styled saving system
+    -- So that means saving the alt weapon ammo and spare ammo is not possible in the RavenM version
     local pickupData = obj.GetComponent(ScriptedBehaviour).self
     if (pickupData) then
         -- Apply some important stuff
         -- Weapon Entry
-        pickupData.weaponEntry = weapon.weaponEntry
+        local weaponPrefab = GameObject.Instantiate(weapon.weaponEntry.prefab, obj.transform)
+        weaponPrefab.transform.localPosition = Vector3.zero
+        weaponPrefab.transform.localRotation = Quaternion.identity
+        weaponPrefab.SetActive(false)
 
         -- Weapon Ammo
-        pickupData.weaponAmmo = weapon.ammo
-        pickupData.weaponSpareAmmo = weapon.spareAmmo
+        local weaponAmmo = GameObject.Instantiate(self.emptyCopy, obj.transform)
+        weaponAmmo.name = tostring(weapon.ammo)
+        local weaponSpareAmmo = GameObject.Instantiate(self.emptyCopy, obj.transform)
+        weaponSpareAmmo.name = tostring(weapon.spareAmmo)
 
-        for _,altWep in pairs(weapon.alternativeWeapons) do
-            pickupData.altWeaponAmmo[#pickupData.altWeaponAmmo+1] = altWep.ammo
-            pickupData.altWeaponSpareAmmo[#pickupData.altWeaponSpareAmmo+1] = altWep.spareAmmo
-        end
+        -- RavenM stuff
+        -- Pls work...
+        local dropID = GameObject.Instantiate(self.emptyCopy, obj.transform)
+        dropID.name = "lqswpbase;;" .. tostring(self.curIDIndex) .. ";;dropid"
 
-        -- Set some settings up
-        -- Despawning
-        if (self.canDespawn) then
-            pickupData:StartLifetime(self.despawnTime)
-        end
+        -- Update the current id index
+        self.curIDIndex = self.curIDIndex + 1
+        OnlinePlayer.SendPacketToServer("lqswpbase;;" .. tostring(self.curIDIndex) .. ";;updateidindex", tonumber(self.weaponPickupBaseID), true)
 
-        -- Physics Freezing
-        if (self.freezePhysicsWhenStopped) then
-            pickupData.freezePhysicsEnabled = true
-            pickupData.freezePhysicsDistance = self.freezePhysicsDistance
-        end
-
-        -- Debugging, only in test mode
-        if (Debug.isTestMode) then
-            pickupData:Debug()
-        end
-
-        -- Return the pickupData script for later
-        return pickupData
+        -- Add the prefab to the network
+        Lobby.AddNetworkPrefab(obj)
     end
 end
 
-function LQS_WeaponPickupBase:WeaponPickupObjectSetup(obj, weaponImposter)
+function LQS_WeaponPickupBaseM:WeaponPickupObjectSetup(obj, weaponImposter)
     if (not obj) then return end
     if (not weaponImposter) then return end
 
@@ -582,13 +670,14 @@ function LQS_WeaponPickupBase:WeaponPickupObjectSetup(obj, weaponImposter)
             end
         end
 
-        -- Parent weaponImposter to object
+        -- Parent weaponImposter to object and rename object
+        obj.name = "[LQS]PickupHitboxM{}"
         weaponImposter.transform.parent = obj.transform
     end
 end
 
 -- These two functions are gotten off Chai's weapon pickup code should fix some weapons just vanishing when dropped
-function LQS_WeaponPickupBase:GreaterOrEqualScale(objScale,other)
+function LQS_WeaponPickupBaseM:GreaterOrEqualScale(objScale,other)
 	if (objScale.x >= other.x and objScale.y >= other.y and objScale.z >= other.z) then
         return true
     else
@@ -596,7 +685,7 @@ function LQS_WeaponPickupBase:GreaterOrEqualScale(objScale,other)
     end
 end
 
-function LQS_WeaponPickupBase:LessOrEqualScale(objScale, other)
+function LQS_WeaponPickupBaseM:LessOrEqualScale(objScale, other)
 	if (objScale.x <= other.x and objScale.y <= other.y and objScale.z <= other.z) then
         return true
     else
@@ -604,7 +693,7 @@ function LQS_WeaponPickupBase:LessOrEqualScale(objScale, other)
     end
 end
 
-function LQS_WeaponPickupBase:CanPickup()
+function LQS_WeaponPickupBaseM:CanPickup()
     if (not GameManager.isPaused) then
         if (Player.actor and not Player.actor.isDead) then
             if (self.canPickup) then
@@ -615,7 +704,7 @@ function LQS_WeaponPickupBase:CanPickup()
     return false
 end
 
-function LQS_WeaponPickupBase:CanDrop()
+function LQS_WeaponPickupBaseM:CanDrop()
     if (not GameManager.isPaused) then
         if (Player.actor and Player.actor.activeWeapon) then
             return true
@@ -624,7 +713,7 @@ function LQS_WeaponPickupBase:CanDrop()
     return false
 end 
 
-function LQS_WeaponPickupBase:CanBeDropped(weapon)
+function LQS_WeaponPickupBaseM:CanBeDropped(weapon)
     if (not weapon) then return false end
     if (self.canBlacklist) then
         if (not self.blacklistedWeapons[weapon.weaponEntry.name]) then
@@ -635,7 +724,7 @@ function LQS_WeaponPickupBase:CanBeDropped(weapon)
     return true
 end
 
-function LQS_WeaponPickupBase:IsLargeGear(weapon)
+function LQS_WeaponPickupBaseM:IsLargeGear(weapon)
 	if (weapon) then
 		if (weapon.slot == WeaponSlot.LargeGear) then
 			return true
@@ -644,7 +733,7 @@ function LQS_WeaponPickupBase:IsLargeGear(weapon)
     return false
 end
 
-function LQS_WeaponPickupBase:IsGear(weapon)
+function LQS_WeaponPickupBaseM:IsGear(weapon)
     if (weapon) then
 		if (weapon.slot == WeaponSlot.Gear) then
 			return true
@@ -654,15 +743,15 @@ function LQS_WeaponPickupBase:IsGear(weapon)
 end
 
 -- These stuff below are made by RadioactiveJellyfish
-function LQS_WeaponPickupBase:AddOnWeaponPickupListener(owner,func)
+function LQS_WeaponPickupBaseM:AddOnWeaponPickupListener(owner,func)
 	self.onWeaponPickUpListeners[owner] = func
 end
 
-function LQS_WeaponPickupBase:RemoveOnWeaponPickupListener(owner)
+function LQS_WeaponPickupBaseM:RemoveOnWeaponPickupListener(owner)
 	self.onWeaponPickUpListeners[owner] = nil
 end
 
-function LQS_WeaponPickupBase:InvokeOnWeaponPickupEvent(weapon)
+function LQS_WeaponPickupBaseM:InvokeOnWeaponPickupEvent(weapon)
 	for owner, func in pairs(self.onWeaponPickUpListeners) do
 		func(weapon)
 	end
