@@ -71,6 +71,9 @@ function LQS_WeaponPickupBase:Start()
     self.canvas.SetActive(false)
 	self.anarchyHUD.SetActive(false)
 	self.defaultHUD.SetActive(false)
+
+    -- Share Instance
+    _G.LQSWeaponPickupBase = self.gameObject.GetComponent(ScriptedBehaviour).self
 end
 
 function LQS_WeaponPickupBase:CheckKeyCode(key)
@@ -461,6 +464,7 @@ function LQS_WeaponPickupBase:ApplyAltWeaponsAmmoAndSpareAmmo(weapon, data)
     -- has no subweapons in it despite having some
     return function()
         coroutine.yield(WaitForSeconds(0))
+        if (not weapon or not data) then return end
         for index,altWep in pairs(weapon.alternativeWeapons) do
             altWep.ammo = data.altWeaponAmmo[index]
             altWep.spareAmmo = data.altWeaponSpareAmmo[index]
@@ -573,7 +577,7 @@ function LQS_WeaponPickupBase:WeaponPickupObjectSetup(obj, weaponImposter)
     if (not weaponImposter) then return end
 
     -- This setups the pickup object and bounds, nothing related with data passing
-    local weaponRenderer = weaponImposter.gameObject.GetComponent(Renderer)
+    local weaponRenderer = weaponImposter.GetComponent(Renderer)
     if (weaponRenderer) then
         -- Apply bounds size if possible
         if (not self:GreaterOrEqualScale(weaponRenderer.bounds.size, Vector3(1.9, 1.9, 1.9))) then
@@ -581,10 +585,10 @@ function LQS_WeaponPickupBase:WeaponPickupObjectSetup(obj, weaponImposter)
                 obj.transform.localScale = weaponRenderer.bounds.size
             end
         end
-
-        -- Parent weaponImposter to object
-        weaponImposter.transform.parent = obj.transform
     end
+
+    -- Parent weaponImposter to object
+    weaponImposter.transform.parent = obj.transform
 end
 
 -- These two functions are gotten off Chai's weapon pickup code should fix some weapons just vanishing when dropped
