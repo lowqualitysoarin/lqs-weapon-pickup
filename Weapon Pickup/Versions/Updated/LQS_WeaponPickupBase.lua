@@ -185,26 +185,23 @@ function LQS_WeaponPickupBase:OnActorDied(actor)
 
     -- Actor Drop
     if (self:CanBeDropped(actor.activeWeapon)) then
-        if (self.dropChanceEnabled) then
-            local luck = Random.Range(0, 100)
-
-            if (self.dropChanceDontAffectPlayer) then
-                if (not actor.isPlayer) then
-                    if (luck < self.dropChance) then
-                        self:DropWeapon(actor, actor.activeWeapon)
-                    end
-                else
-                    self:DropWeapon(actor, actor.activeWeapon)
-                end
-            else
-                if (luck < self.dropChance) then
-                    self:DropWeapon(actor, actor.activeWeapon)
-                end
-            end
-        else
+        if (self:ChanceSystem(actor)) then
             self:DropWeapon(actor, actor.activeWeapon)
         end
     end
+end
+
+function LQS_WeaponPickupBase:ChanceSystem(actor)
+    if (not self.dropChanceEnabled) then return true end
+    if (self.dropChanceDontAffectPlayer and actor.isPlayer) then return true end
+
+    -- A chance system
+    -- Making it a function, because it will make the script look cleaner idk
+    local luck = Random.Range(0, 100)
+    if (luck < self.dropChance) then
+        return true
+    end
+    return false
 end
 
 function LQS_WeaponPickupBase:Update()
@@ -217,7 +214,7 @@ end
 
 function LQS_WeaponPickupBase:QueueChecker()
     if (not Player.actor) then return end
-    if (self.queuePickupData and not self.queuePickupData.gameObject) then self:ResetHUD() return end
+    if (self.queuePickupData and not self.queuePickupData.gameObject) then return end
 
     -- Idk what to call this lmfaoo, it basically the thing that handles the selection menus.
     -- Like if the player moves away from the pickup the menu automatically closes, or if the weapon drop is destroyed.

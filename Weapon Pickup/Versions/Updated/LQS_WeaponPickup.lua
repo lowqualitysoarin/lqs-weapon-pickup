@@ -28,11 +28,13 @@ function LQS_WeaponPickup:Debug()
 	print("Ammo:","<color=yellow>" .. tostring(self.weaponAmmo) .. "</color>")
 	print("SpareAmmo:","<color=yellow>" .. tostring(self.weaponSpareAmmo) .. "</color>")
 
-	print("AltWeapons Ammo and SpareAmmo:")
-	for index1,altAmmo in pairs(self.altWeaponAmmo) do
-		for index2,altSpareAmmo in pairs(self.altWeaponSpareAmmo) do
-			print("[<color=orange>" .. tostring(index1) .. "</color>]" .. " Ammo:","<color=yellow>" .. tostring(altAmmo) .. "</color>")
-			print("[<color=orange>" .. tostring(index2) .. "</color>]" .. " SpareAmmo:","<color=yellow>" .. tostring(altSpareAmmo) .. "</color>")
+	if (#self.altWeaponAmmo > 0 and #self.altWeaponSpareAmmo) then
+		print("AltWeapons Ammo and SpareAmmo:")
+		for index1,altAmmo in pairs(self.altWeaponAmmo) do
+			for index2,altSpareAmmo in pairs(self.altWeaponSpareAmmo) do
+				print("[<color=orange>" .. tostring(index1) .. "</color>]" .. " Ammo:","<color=yellow>" .. tostring(altAmmo) .. "</color>")
+				print("[<color=orange>" .. tostring(index2) .. "</color>]" .. " SpareAmmo:","<color=yellow>" .. tostring(altSpareAmmo) .. "</color>")
+			end
 		end
 	end
 end

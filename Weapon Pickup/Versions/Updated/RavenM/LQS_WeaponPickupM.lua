@@ -2,6 +2,16 @@
 behaviour("LQS_WeaponPickupM")
 
 function LQS_WeaponPickupM:Awake()
+	-- Data
+	self.dropID = nil
+	self.weaponEntry = nil
+
+	self.weaponAmmo = 0
+	self.weaponSpareAmmo = 0
+
+	self.altWeaponAmmo = {}
+	self.altWeaponSpareAmmo = {}
+
 	-- Some components soo I don't need to do getcomponent again
 	self.dropRB = self.gameObject.GetComponent(Rigidbody)
 
@@ -11,23 +21,49 @@ function LQS_WeaponPickupM:Awake()
 	self.playerInRange = false
 	self.freezePhysicsTimer = 0
 	self.freezePhysicsDistance = 150
-
-	-- Events
-    GameEventsOnline.onReceivePacket.AddListener(self,"ReceivePacket")
-end
-
-function LQS_WeaponPickupM:ReceivePacket(id, data)
-	self:AssignFinalTransform(data)
 end
 
 function LQS_WeaponPickupM:Start()
-	-- Apply config
-	local lqsWeaponBase = _G.LQSWeaponPickupBaseM
-	if (lqsWeaponBase) then
-		self.weaponPickupBase = lqsWeaponBase
-		self.freezePhysicsEnabled = self.weaponPickupBase.freezePhysicsWhenStopped
-		self.freezePhysicsDistance = self.weaponPickupBase.freezePhysicsDistance
+	-- Events
+    GameEventsOnline.onReceivePacket.AddListener(self,"ReceivePacket")
+	GameEventsOnline.onSendPacket.AddListener(self,"SendPacket")
+
+	-- Get the weapon pickup base's script
+	self.weaponPickupBase = _G.LQSWeaponPickupBaseM
+end
+
+function LQS_WeaponPickupM:Debug()
+	local weaponEntryName = "Name: " .. "<color=green>" .. self.weaponEntry.name .. "</color>"
+	print("WeaponEntry:","<color=blue>" .. tostring(self.weaponEntry) .. "</color>",weaponEntryName)
+
+	print("Ammo:","<color=yellow>" .. tostring(self.weaponAmmo) .. "</color>")
+	print("SpareAmmo:","<color=yellow>" .. tostring(self.weaponSpareAmmo) .. "</color>")
+
+	if (#self.altWeaponAmmo > 0 and #self.altWeaponSpareAmmo > 0) then
+		print("AltWeapons Ammo and SpareAmmo:")
+		for index1,altAmmo in pairs(self.altWeaponAmmo) do
+			for index2,altSpareAmmo in pairs(self.altWeaponSpareAmmo) do
+				print("[<color=orange>" .. tostring(index1) .. "</color>]" .. " Ammo:","<color=yellow>" .. tostring(altAmmo) .. "</color>")
+				print("[<color=orange>" .. tostring(index2) .. "</color>]" .. " SpareAmmo:","<color=yellow>" .. tostring(altSpareAmmo) .. "</color>")
+			end
+		end
 	end
+
+	print("Drop ID:", "<color=aqua>" .. self.dropID .. "</color>")
+end
+
+function LQS_WeaponPickupM:StartLifetime(duration)
+	-- Lifetime of the pickup
+	GameObject.Destroy(self.gameObject, duration)
+end
+
+function LQS_WeaponPickupM:SendPacket(id, data)
+	self:DestroyPickup(data)
+end
+
+function LQS_WeaponPickupM:ReceivePacket(id, data)
+	self:DestroyPickup(data)
+	self:AssignFinalTransform(data)
 end
 
 function LQS_WeaponPickupM:Update()
@@ -55,7 +91,7 @@ function LQS_WeaponPickupM:Update()
 
 		-- Update the current transform through all clients
 	    -- Only works if the object isn't moving on the host's end, doing this here. Because in update it results a accurate position/rotation view on all
-		-- clients. But in exchange of having the worst frames as possible on the clients. The host don't experience lag at all
+	    -- clients. But in exchange of having the worst frames as possible on the clients. The host don't experience lag at all
 	    if (Lobby.isHost and self.weaponPickupBase and not self.alreadySentPacket) then
 	    	self:GetFinalTransform()
 	    end 
@@ -66,13 +102,32 @@ function LQS_WeaponPickupM:Update()
 	end
 end
 
+function LQS_WeaponPickupM:SendDestroyPacket(dropID)
+	-- Just realised packets aren't universal lol
+	OnlinePlayer.SendPacketToServer("lqswp;;" .. dropID .. ";;weaponpickedup", tonumber(self.weaponPickupBase.weaponPickupBaseID), true)
+end
+
+function LQS_WeaponPickupM:DestroyPickup(data)
+	-- Basically destroys the pickup
+	-- If the id in the packet matches with the pickup's dropID
+	-- Then the drop destroys it self
+	if (not self.weaponPickupBase) then return end
+	local unwrappedData = self.weaponPickupBase:UnwrapPacket(data)
+
+	if (#unwrappedData == 0) then return end
+	if (unwrappedData[1] ~= "lqswp") then return end
+	if (unwrappedData[3] ~= "weaponpickedup") then return end
+
+	if (unwrappedData[2] == self.dropID) then
+		GameObject.Destroy(self.gameObject)
+	end
+end
+
 function LQS_WeaponPickupM:GetFinalTransform()
 	local restPosition = self.transform.position
 	local restRotation = self.transform.rotation
 
-	local dropID = self.transform.GetChild(4).gameObject.name
-
-	OnlinePlayer.SendPacketToServer("lqswp;;" .. dropID  .. ";;assignfinalpos;;" .. 
+	OnlinePlayer.SendPacketToServer("lqswp;;" .. self.dropID  .. ";;assignfinalpos;;" .. 
 	tostring(restPosition.x) .. ";;" .. tostring(restPosition.y) .. ";;" .. tostring(restPosition.z) .. ";;" ..
     tostring(restRotation.eulerAngles.x) .. ";;" .. tostring(restRotation.eulerAngles.y) .. ";;" .. tostring(restRotation.eulerAngles.z), 
 	tonumber(self.weaponPickupBase.weaponPickupBaseID), true)
@@ -91,23 +146,19 @@ function LQS_WeaponPickupM:AssignFinalTransform(data)
 
 	-- Have to do more checking on this piece of shit because the clients
 	-- do get errors for some strange reasons
-	local thisDropOBJ = self.transform.GetChild(4).gameObject
-	if (thisDropOBJ) then
-		local thisDropID = thisDropOBJ.name
-		if (unwrappedData[2] == thisDropID) then
-			local foundFinalPos = Vector3(
-				tonumber(unwrappedData[4]),
-				tonumber(unwrappedData[5]),
-				tonumber(unwrappedData[6])
-			)
-			local foundFinalRot = Vector3(
-				tonumber(unwrappedData[7]),
-				tonumber(unwrappedData[8]),
-				tonumber(unwrappedData[9])
-			)
-	
-			self.script.StartCoroutine(self:LerpToFinal(foundFinalPos, Quaternion.Euler(foundFinalRot)))
-		end
+	if (unwrappedData[2] == self.dropID) then
+		local foundFinalPos = Vector3(
+			tonumber(unwrappedData[4]),
+			tonumber(unwrappedData[5]),
+			tonumber(unwrappedData[6])
+		)
+		local foundFinalRot = Vector3(
+			tonumber(unwrappedData[7]),
+			tonumber(unwrappedData[8]),
+			tonumber(unwrappedData[9])
+		)
+
+		self.script.StartCoroutine(self:LerpToFinal(foundFinalPos, Quaternion.Euler(foundFinalRot)))
 	end
 end
 
