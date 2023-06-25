@@ -74,6 +74,7 @@ function LQS_WeaponPickupBaseM:Start()
     -- Vars
     self.queuePickupData = nil
     self.isMenuOpen = false
+    self.alreadyDisabledHUD = true
 
 	-- Finishing touches
     -- Compatability
@@ -272,7 +273,13 @@ end
 
 function LQS_WeaponPickupBaseM:QueueChecker()
     if (not Player.actor) then return end
-    if (self.queuePickupData and not self.queuePickupData.gameObject) then return end
+    if (self.queuePickupData and not self.queuePickupData.gameObject) then
+        if (not self.alreadyDisabledHUD) then
+            self:ResetHUD()
+            self.alreadyDisabledHUD = true
+        end 
+        return 
+    end
 
     -- Idk what to call this lmfaoo, it basically the thing that handles the selection menus.
     -- Like if the player moves away from the pickup the menu automatically closes, or if the weapon drop is destroyed.
@@ -285,6 +292,7 @@ function LQS_WeaponPickupBaseM:QueueChecker()
     else
         self:ResetHUD()
     end
+    self.alreadyDisabledHUD = false
 end
 
 function LQS_WeaponPickupBaseM:WeaponPickupMain()
