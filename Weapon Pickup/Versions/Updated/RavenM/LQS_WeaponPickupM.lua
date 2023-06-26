@@ -67,13 +67,12 @@ function LQS_WeaponPickupM:ReceivePacket(id, data)
 end
 
 function LQS_WeaponPickupM:Update()
-	if (not self.freezePhysicsEnabled) then return end
 	if (not Player.actor) then return end
 
 	-- Distance checking for the physics freeze
-	-- I'm using sqrMagnitude since its more optimised they say
-	local distanceToPlayer = self.transform.position - Player.actor.transform.position
-	if (distanceToPlayer.sqrMagnitude > self.freezePhysicsDistance) then
+	-- Nvm switching to Vector3.Distance, it causes awful perf on my end
+	local distanceToPlayer = Vector3.Distance(self.transform.position, Player.actor.transform.position)
+	if (distanceToPlayer > self.freezePhysicsDistance) then
 		self.playerInRange = false
 	else
 		self.playerInRange = true
@@ -82,7 +81,7 @@ function LQS_WeaponPickupM:Update()
 	-- This is mostly some rigidbody stuff
 	if (self.dropRB.velocity.magnitude < 1) then
 		-- Freeze the rigidbody if the player isn't in range
-		if (not self.playerInRange) then
+		if (not self.playerInRange and self.freezePhysicsEnabled) then
 			self.freezePhysicsTimer = self.freezePhysicsTimer + 1 * Time.deltaTime
 			if (self.freezePhysicsTimer >= 5) then
 				self.dropRB.isKinematic = true

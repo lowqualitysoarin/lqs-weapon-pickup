@@ -49,9 +49,9 @@ function LQS_WeaponPickup:Update()
 	if (not Player.actor) then return end
 
 	-- Distance checking for the physics freeze
-	-- I'm using sqrMagnitude since its more optimised they say
-	local distanceToPlayer = self.transform.position - Player.actor.transform.position
-	if (distanceToPlayer.sqrMagnitude > self.freezePhysicsDistance) then
+	-- Nvm switching to Vector3.Distance, it causes awful perf on my end
+	local distanceToPlayer = Vector3.Distance(self.transform.position, Player.actor.transform.position)
+	if (distanceToPlayer > self.freezePhysicsDistance) then
 		self.playerInRange = false
 	else
 		self.playerInRange = true
