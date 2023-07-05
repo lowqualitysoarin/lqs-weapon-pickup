@@ -215,7 +215,7 @@ end
 
 function LQS_WeaponPickupBase:QueueChecker()
     if (not Player.actor) then return end
-    if (self.queuePickupData and not self.queuePickupData.gameObject) then 
+    if (self:CanResetHUD()) then 
         if (not self.alreadyDisabledHUD) then
             self:ResetHUD()
             self.alreadyDisabledHUD = true
@@ -226,15 +226,26 @@ function LQS_WeaponPickupBase:QueueChecker()
     -- Idk what to call this lmfaoo, it basically the thing that handles the selection menus.
     -- Like if the player moves away from the pickup the menu automatically closes, or if the weapon drop is destroyed.
     local player = Player.actor
-    if (self.isMenuOpen and player and not player.isDead) then
+    if (self.isMenuOpen) then
         local distanceToPickup = self.queuePickupData.transform.position - player.transform.position
         if (distanceToPickup.sqrMagnitude > 1.65) then
             self:ResetHUD()
         end
-    else
-        self:ResetHUD()
     end
     self.alreadyDisabledHUD = false
+end
+
+function LQS_WeaponPickupBase:CanResetHUD()
+    if (self.isMenuOpen) then
+        if (self.queuePickupData) then
+            if (self.queuePickupData.gameObject) then
+                if (not Player.actor.isDead) then
+                    return false
+                end
+            end
+        end
+    end
+    return true
 end
 
 function LQS_WeaponPickupBase:WeaponPickupMain()
@@ -329,6 +340,7 @@ function LQS_WeaponPickupBase:AnarchyDropWeaponSelected(selectedSlot)
 		if (wep.slot == selectedSlot) then
 			if (self:CanBeDropped(wep)) then
 				self:DropWeapon(Player.actor, wep, true)
+                break
 			end
 		end
 	end
